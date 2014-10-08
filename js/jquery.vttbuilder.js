@@ -37,14 +37,16 @@
         this.control_panel = null;
         this.button_play = null;
         this.button_pause = null;
-        //this.button_create = null;
         this.video = null;
         this.video_obj = null;
         this.video_id = null;
         this.caption = null;
         this.caption_text = null;
         this.caption_save = null;
-        //this.caption_cancel = null;
+        this.caption_update = null;
+        this.caption_continue = null;
+        this.caption_pause = null;
+        this.caption_delete = null;
         this.timeline = null;
         this.timeline_list = null;
         this.timeline_tracker = null;
@@ -54,6 +56,7 @@
         this.last_headpoint = 0;
         this.current_headpoint = 0;
         this.timeline_offset = 0;
+        this.timeline_size = 0;
 
         this.current_id = 1;
         this.edit_cue = null;
@@ -75,19 +78,20 @@
             self.control_panel = element.find('.vttb_controls:first');
             self.button_play = self.control_panel.find('.play:first').click(self.button_play_event);
             self.button_pause = self.control_panel.find('.pause:first').click(self.button_pause_event);
-            //self.button_create = self.control_panel.find('.create:first').click(self.button_create_event).hide();
 
             // Video
             self.video = element.find('.vttb_video:first');
             self.video_id = self.video.find('video:first').attr('id');
-            self.video_obj = _V_(self.video_id);
+            self.video_obj = _V_('id_video');
 
             // Caption
             this.caption = element.find('.vttb_caption:first');
             this.caption_text = this.caption.find('.text:first');
-            this.caption_save = this.caption.find('.save:first').click(function() { self.caption_save_event(); });
-            this.caption_continue = this.caption.find('.continue:first').click(function() { self.caption_continue_event(); });
-            //this.caption_cancel = this.caption.find('.cancel:first').click(function() { self.caption_cancel_event(); });
+            this.caption_save = this.caption.find('.save:first').click(function() { self.caption_save_event(); }).hide();
+            this.caption_update = this.caption.find('.update:first').click(function() { self.caption_update_event(); }).hide();
+            this.caption_continue = this.caption.find('.continue:first').click(function() { self.caption_continue_event(); }).hide();
+            this.caption_delete = this.caption.find('.delete:first').click(function() { self.caption_delete_event(); }).hide();
+            this.caption_pause = this.caption.find('.pause:first');
 
             // Timeline
             this.timeline = element.find('.vttb_timeline:first');
@@ -98,53 +102,64 @@
             this.val = element.find('.vttb_val:first');
             this.val_value = this.val.find('.value:first');
 
-            // Events
-            self.video_obj.addEvent("timeupdate", function() { self.video_time_update(this.currentTime()); })
-            self.video_obj.addEvent("loadedmetadata", function() {
-                var duration = Math.round(self.video_obj.duration());
-                self.timeline_list.css('width', (duration*self.options.tracker_size)+'px')
-                for (i = 0; i < duration; i++) {
-                    self.timeline_list.append($('<li />').addClass(self.get_time_class(i)).addClass('second').html(i+"m"));
-                }
-                self.timeline.scrollTo({left:0, top:0});
+            // Video events
+            self.video_obj.on("loadedmetadata", function() { self.load_timeline(Math.round(this.duration())); });
+            self.video_obj.on("timeupdate", function() {
+                var current_time = this.currentTime();
+                self.update_timeline(current_time);
+                self.update_captions(current_time);
+                self.update_status();
             });
-            self.video_obj.addEvent("play", function() {
+            self.video_obj.on("play", function() {
                 self.button_play.addClass('active');
                 self.button_pause.removeClass('active');
+                self.caption_text.attr('disabled', true);
+                self.caption_pause.show();
             });
-            self.video_obj.addEvent("pause", function() {
+            self.video_obj.on("pause", function() {
                 self.button_pause.addClass('active');
                 self.button_play.removeClass('active');
+                self.caption_text.attr('disabled', false);
+                self.caption_pause.hide();
             });
 
-            self.video_obj.ready(function(){
-                //self.video_obj.play();
-            });
-
+            // List events
             self.list.find('dl').live('click', function() {
-                self.edit_caption($(this).data('id'));
+                var id = $(this).data('id');
+                self.state_edit_caption(id);
             });
 
-            // Autoload
+            // Load exisiting VTT content
             self.load_vtt();
         };
 
-        this.edit_caption = function(id, no_time_shift) {
-            var cue = self.find_caption_by_id(id);
-            //self.caption.show();
-            self.caption_text.val(cue.caption);
-            self.edit_cue = cue;
-            self.set_status(cue.start, cue.end);
-            if (!no_time_shift) {
-                self.button_pause_event();
-                self.video_obj.currentTime(cue.start);
-            }
+        // List
+        //
+
+        this.rebuild_list = function() {
+            self.list.empty();
+            $.each(self.captions, function(key,cap){
+                self.list.append($('<dl data-id="'+cap.id+'"><dd>'+self.parse_time(cap.start)+'</dd><dd>'+self.parse_time(cap.end)+'</dd><dd>'+cap.caption+'</dd></dl>'));
+            });
+
+            // Save VTT
+            self.val_value.val(self.save_vtt());
         };
 
-        this.get_time_class = function(time) {
-            time = Math.round(time*10)/10;
-            return "time"+time.toString().replace('.', '-');
+        // Status
+        //
+        this.update_status = function() {
+            self.status.show();
+            self.set_status(self.last_headpoint,self.current_headpoint);
         };
+
+        this.set_status = function(start, end) {
+            self.status_start.text(self.parse_time(start));
+            self.status_end.text(self.parse_time(end));
+        };
+
+        // Control panel
+        //
 
         this.button_play_event = function() {
             self.video_obj.play();
@@ -154,69 +169,52 @@
             self.video_obj.pause();
         };
 
-        this.button_create_event = function(ignore_replay) {
-            // if (!self.caption.is(':visible'))
-            //     self.button_pause_event();
-            // else if (!ignore_replay)
-            //     self.button_play_event();
 
-            //self.caption.toggle();
-            //self.edit_cue = false;
-        };
+        // Timeline (seconds)
+        //
 
-        this.caption_continue_event = function() {
-            self.caption_save_event(true);
-        };
-
-        this.caption_save_event = function(is_continue) {
-            if (self.edit_cue) {
-                self.edit_cue.caption = self.caption_text.val();
-                self.edit_cue = null;
-                // self.button_create_event(!is_continue);
-            } else {
-                var cue = {
-                    id: self.current_id,
-                    start: self.last_headpoint,
-                    end: self.current_headpoint,
-                    caption: self.caption_text.val()
-                };
-
-                if (cue.start >= cue.end)
-                    return;
-
-                self.captions.push(cue);
-                self.create_cue(cue);
-                self.last_headpoint = self.current_headpoint;
-                self.current_id++;
-                // self.button_create_event();
-                self.caption_text.val('');
+        this.load_timeline = function(duration) {
+            self.timeline_size = duration*self.options.tracker_size;
+            self.timeline_list.empty();
+            self.timeline_list.width(self.timeline_size);
+            for (i = 0; i < duration; i++) {
+                self.timeline_list.append($('<li />').addClass(self.get_time_class(i)).html(i+"s"));
             }
-
-            if (is_continue)
-                self.button_play_event();
-
-            self.rebuild_list();
+            self.timeline.scrollTo({left:0, top:0});
         };
 
-        // this.caption_cancel_event = function(no_hide_form) {
-        //     self.caption_text.val('');
-        //     if (!no_hide_form)
-        //         self.caption.hide();
-        //     self.edit_cue = false;
-        // };
+        this.update_timeline = function(current_time) {
+            self.current_headpoint = current_time;
+            var timeline_width = self.timeline.width();
+            var left_offset = (current_time*self.options.tracker_size) - (timeline_width/2);
+            var full_offset = self.timeline_size - timeline_width;
 
-        this.jump_to_last_cue = function() {
-            if (self.captions.length > 0) {
-                cue = self.captions[self.captions.length-1];
-                self.video_obj.currentTime(cue.end);
-            }
+            if (left_offset < 0)
+                left_offset = 0;
+            else if (left_offset > full_offset)
+                left_offset = full_offset;
+
+            self.timeline_offset = left_offset;
+            self.timeline.scrollTo({left:left_offset, top:0});
+            self.timeline_tracker.width(current_time*self.options.tracker_size);
+
         };
 
-        this.create_cue = function(cue) {
+        // Timeline (tags)
+        //
+
+        this.create_tag = function(cue) {
             var cue_width = (cue.end - cue.start) * self.options.tracker_size;
             var cue_left = cue.start * self.options.tracker_size;
             var cue_right = cue.end * self.options.tracker_size;
-            var cue_el = $('<div />').addClass('cue').addClass('cue-'+cue.id).width(cue_width).css('left',cue_left).attr('data-id', cue.id).text(cue.caption);
+            var cue_el = $('<div />')
+                .attr('data-id', cue.id)
+                .addClass('cue')
+                .addClass('cue-'+cue.id)
+                .css('left',cue_left)
+                .width(cue_width)
+                .text(cue.caption);
+
             var handle_el = $('<div />').addClass('handle').css('left', cue_right);
             self.timeline.append(cue_el).append(handle_el);
 
@@ -224,11 +222,12 @@
             self.handles[cue.id] = handle_el;
 
             handle_el.drag(function(ev, dd){
-                self.resize_cue($(this), dd.offsetX);
+                self.move_tag($(this), dd.offsetX);
             }, {relative:true});
         };
 
-        this.resize_cue = function(handle, offset_left) {
+
+        this.move_tag = function(handle, offset_left) {
 
             var drag_left = self.timeline_offset+offset_left;
 
@@ -252,62 +251,168 @@
             }
 
             // Good to go...
-            self.reset_cue_left(previous, cue_left, drag_left);
+            self.reset_tag_left(previous, cue_left, drag_left);
             if (next.length > 0) {
-                self.reset_cue_right(next, cue_right, drag_left);
+                self.reset_tag_right(next, cue_right, drag_left);
             }
             else if (drag_left > self.current_headpoint) {
                 self.last_headpoint = drag_left / self.options.tracker_size;
-                self.status_event();
+                self.update_status();
             }
 
             handle.css({ left:drag_left });
-            //self.video_obj.currentTime(drag_left / self.options.tracker_size);
 
             // Rebuild the list
             self.rebuild_list();
         };
 
-        this.reset_cue_left = function(el, cue, drag_left) {
+        this.reset_tag_left = function(el, cue, drag_left) {
             cue.end = drag_left / self.options.tracker_size;
             var cue_width = (cue.end - cue.start) * self.options.tracker_size;
             el.width(cue_width);
         };
 
-        this.reset_cue_right = function(el, cue, drag_left) {
+        this.reset_tag_right = function(el, cue, drag_left) {
             cue.start = drag_left / self.options.tracker_size;
             var cue_width = (cue.end - cue.start) * self.options.tracker_size;
             el.css('left', drag_left);
             el.width(cue_width);
         }
 
-        this.rebuild_list = function() {
-            self.list.empty();
-            $.each(self.captions, function(key,cap){
-                self.list.append($('<dl data-id="'+cap.id+'"><dd>'+self.parse_time(cap.start)+'</dd><dd>'+self.parse_time(cap.end)+'</dd><dd>'+cap.caption+'</dd></dl>'));
-            });
 
-            // Set value
-            self.val_value.val(self.save_vtt());
+        // Create caption
+        //
+
+        this.caption_continue_event = function() {
+            self.caption_save_event(true);
         };
 
-        this.find_caption_by_id = function(id) {
-            var result = null;
-            $.each(self.captions, function(key,cue) {
-                if (cue.id == id)
-                    result = cue;
-            });
-            return result;
+        this.caption_save_event = function(is_continue) {
+
+            var cue = {
+                id: self.current_id,
+                start: self.last_headpoint,
+                end: self.current_headpoint,
+                caption: self.caption_text.val()
+            };
+
+            if (cue.start >= cue.end)
+                return;
+
+            self.captions.push(cue);
+            self.create_tag(cue);
+            self.last_headpoint = self.current_headpoint;
+            self.current_id++;
+            self.caption_text.val('');
+
+            if (is_continue)
+                self.button_play_event();
+
+            self.rebuild_list();
         };
 
-        this.find_caption_by_time = function(time) {
-            var result = null;
-            $.each(self.captions, function(key,cue) {
-                if (cue.start <= time && cue.end > time)
-                    result = cue;
-            });
-            return result;
+        this.state_create_caption = function() {
+            self.caption_text.val('');
+
+            self.caption_save.show();
+            self.caption_continue.show();
+            self.caption_update.hide();
+            self.caption_delete.hide();
         };
+
+
+        // Update caption
+        //
+
+        this.caption_update_event = function() {
+            self.edit_cue.caption = self.caption_text.val();
+            self.timeline.find('.cue-'+self.edit_cue.id).text(self.edit_cue.caption);
+            self.rebuild_list();
+        };
+
+        this.state_edit_caption = function(id) {
+            var cue = self.find_caption_by_id(id);
+            self.caption_text.val(cue.caption);
+            self.edit_cue = cue;
+            self.set_status(cue.start, cue.end);
+
+            self.caption_save.hide();
+            self.caption_continue.hide();
+            self.caption_update.show();
+            self.caption_delete.show();
+
+        };
+
+        // Delete caption
+        //
+
+        this.caption_delete_event = function() {
+
+            var index = self.captions.indexOf(self.edit_cue);
+            var drag_left = self.edit_cue.start * self.options.tracker_size;
+            if(index != -1)
+                self.captions.splice(index, 1)
+
+            var cue = self.timeline.find('.cue-'+self.edit_cue.id);
+            var handle = cue.next();
+            var prev_handle = cue.prev();
+            handle.remove();
+            cue.remove();
+
+            var previous = prev_handle.prev();
+            var next = prev_handle.next();
+
+            if (previous.length > 0 && previous.data('id')) {
+                var cue_left = self.find_caption_by_id(previous.data('id'));
+                self.reset_tag_left(previous, cue_left, drag_left);
+                self.edit_cue = cue_left;
+            }
+            if (next.length > 0 && next.data('id')) {
+                var cue_right = self.find_caption_by_id(next.data('id'));
+                self.reset_tag_right(next, cue_right, drag_left);
+                self.edit_cue = cue_right;
+            }
+
+            if (self.captions.length == 0)
+                self.last_headpoint = 0;
+            else {
+                var last_cue = self.captions[self.captions.length-1];
+                self.last_headpoint = last_cue.end;
+            }
+
+            self.update_status();
+            self.rebuild_list();
+        };
+
+
+        // Captions
+        //
+
+        this.update_captions = function(current_time) {
+            var exisiting_cue = self.find_caption_by_time(current_time);
+
+            if (exisiting_cue)
+                self.state_edit_caption(exisiting_cue.id);
+            else
+                self.state_create_caption();
+        };
+
+        // VTT specific
+        //
+
+        this.load_vtt = function() {
+            var content = self.val_value.val();
+            self.parse_cues(content);
+            $.each(self.captions, function(key, cue){
+                self.current_headpoint = cue.end;
+                self.last_headpoint = cue.end;
+                self.current_id = cue.id;
+                self.create_tag(cue);
+            });
+            self.current_id++;
+            self.rebuild_list();
+        };
+
 
         this.save_vtt = function() {
             var str = "";
@@ -323,68 +428,8 @@
             return str;
         };
 
-        this.status_event = function() {
-            self.status.show();
-            //self.button_create.show();
-            self.set_status(self.last_headpoint,self.current_headpoint);
-        };
-
-        this.set_status = function(start, end) {
-            self.status.show();
-            self.status_start.text(self.parse_time(start));
-            self.status_end.text(self.parse_time(end));
-        };
-
-        this.video_time_update = function(current_time) {
-            self.current_headpoint = current_time;
-            var timeline_width = self.timeline.width();
-            var left_offset = (current_time*self.options.tracker_size) - (timeline_width/2);
-
-            if (left_offset < 0)
-                left_offset = 0;
-
-            self.timeline_offset = left_offset;
-            self.timeline.scrollTo({left:left_offset, top:0});
-            self.timeline_tracker.width(current_time*self.options.tracker_size);
-
-            var exisiting_cue = self.find_caption_by_time(current_time);
-            if (exisiting_cue)
-                self.edit_caption(exisiting_cue.id, true);
-            else
-                self.status_event();
-
-            if (!exisiting_cue && self.edit_cue) {
-                self.caption_text.val('');
-                self.edit_cue = false;
-            }
-            //     self.caption_cancel_event(true);
-
-            //self.timeline_list.find('li.'+self.get_time_class(current_time)).prevAll().addClass('active');
-        };
-
-        this.parse_time = function(time) {
-            if (!time)
-                time = 0;
-
-            var str = "";
-
-            // Hours
-            var hrs = Math.floor(time/(60*60));
-            if (hrs < 10) str += "0";
-            str += hrs.toString() + ":";
-
-            // Minutes
-            var min = Math.floor(time/60) % 60;
-            if (min < 10) str += "0";
-            str += min.toString() + ":";
-
-            // Seconds
-            var sec = time % 60;
-            if (sec < 10) str += "0";
-            str += sec.toFixed(3);
-
-            return str;
-        }
+        // VTT Helpers
+        //
 
         this.parse_cues = function(content) {
             var cue, time, text,
@@ -450,23 +495,63 @@
             return time;
         };
 
-        this.load_vtt = function() {
-            var content = self.val_value.val();
-            self.parse_cues(content);
-            $.each(self.captions, function(key, cue){
-                self.current_headpoint = cue.end;
-                self.last_headpoint = cue.end;
-                self.current_id = cue.id;
-                self.create_cue(cue);
-            });
-            self.current_id++;
-            self.rebuild_list();
-        };
+        // Helpers
+        //
 
         this.trim = function(string) {
             return string.toString().replace(/^\s+/, "").replace(/\s+$/, "");
         };
 
+        this.get_time_class = function(time) {
+            time = Math.round(time*10)/10;
+            return "time"+time.toString().replace('.', '-');
+        };
+
+        this.find_caption_by_id = function(id) {
+            var result = null;
+            $.each(self.captions, function(key,cue) {
+                if (cue.id == id)
+                    result = cue;
+            });
+            return result;
+        };
+
+        this.find_caption_by_time = function(time) {
+            var result = null;
+            $.each(self.captions, function(key,cue) {
+                if (cue.start <= time && cue.end > time)
+                    result = cue;
+            });
+            return result;
+        };
+
+        this.parse_time = function(time) {
+            if (!time)
+                time = 0;
+
+            var str = "";
+
+            // Hours
+            var hrs = Math.floor(time/(60*60));
+            if (hrs < 10) str += "0";
+            str += hrs.toString() + ":";
+
+            // Minutes
+            var min = Math.floor(time/60) % 60;
+            if (min < 10) str += "0";
+            str += min.toString() + ":";
+
+            // Seconds
+            var sec = time % 60;
+            if (sec < 10) str += "0";
+            str += sec.toFixed(3);
+
+            return str;
+        }
+
+
+        // Bootstrapper
+        //
         this.init();
 
     };

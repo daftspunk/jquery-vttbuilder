@@ -28,20 +28,20 @@
 .vttb_timeline ul {
     height:30px;
     background:#FFF;
+    list-style: none;
+    padding: 0;
+    margin: 0;
 }
 .vttb_timeline ul li {
     float:left;
     display:block;
-    width:50px;
+    width:49px;
     height:30px;
     line-height:30px;
     text-indent:5px;
     position:relative;
     z-index:2;
-}
-.vttb_timeline ul li.second {
     border-left:1px solid #ccc;
-    width:49px;
 }
 .vttb_timeline .tracker {
     position: absolute;
@@ -75,10 +75,10 @@
 
 .vttb_timeline .cue {
     background:#ffcccc;
-
+    font-size: 11px;
     text-indent:20px;
-
 }
+
 .vttb_timeline .handle {
     background-image:url('../images/tag_red.png');
     background-repeat:no-repeat;
@@ -93,7 +93,7 @@
 
 .vttb_list {
     clear:both;
-    height:300px;
+    height:200px;
     overflow:auto;
     background:#FFF;
 }
@@ -120,8 +120,13 @@
 .vttb_controls ul {
     width:100%;
     overflow:hidden;
+    list-style: none;
+    padding:0;
+    margin:0;
 }
 .vttb_controls ul li {
+    padding: 0;
+    margin: 0;
     float:left;
 }
 .vttb_controls ul li a {
@@ -150,36 +155,67 @@
 
 /* Caption */
 
+.vttb_caption {
+    margin-top:1em;
+    position: relative;
+}
+
 .vttb_caption textarea {
-    width:100%;
+    width:99%;
     border:1px solid #ccc;
+    height: 200px;
+    padding: 10px;
+    font-family: monospace, monospace;
 }
 
 .vttb_caption ul {
     width:100%;
     overflow:hidden;
+    list-style: none;
+    padding:0;
+    margin:0;
+    padding-top:1em;
 }
 .vttb_caption ul li {
     float:left;
+    padding:0;
+    margin:0;
 }
 .vttb_caption ul li a {
     display:block;
     text-align:center;
     background-repeat:no-repeat;
     margin-right:25px;
-    height:24px;
-    line-height:24px;
-    padding-left:28px;
-    font-size:14px;
+    height:16px;
+    line-height:16px;
+    padding-left:22px;
+    font-size:13px;
+    color:#666;
+}
+
+.vttb_caption ul li a:hover {
+    color:#333;
 }
 
 .vttb_caption ul li a.continue {
     background-image:url('../images/note_go.png');
 }
 
-.vttb_caption ul li a.save {
+.vttb_caption ul li a.save, .vttb_caption ul li a.update, .vttb_caption ul li a.delete {
     border-left:none;
     background-image:url('../images/note.png');
+}
+
+.vttb_caption ul li div.pause {
+    position:absolute;
+    width:100%;
+    line-height:40px;
+    padding: 80px 0;
+    background-color:#f0f0f0;
+    opacity:.5;
+    left:0;
+    top:0;
+    text-align:center;
 }
 
 /* Video JS overrides */
@@ -192,4 +228,11 @@
 
 .vjs-default-skin .vjs-big-play-button {
     display: none !important;
+}
+
+
+/* Value */
+.vttb_val textarea {
+    width: 100%;
+    height: 200px;
 }
