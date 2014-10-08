@@ -20,7 +20,14 @@ var VimeoState = {
 videojs.Vimeo = videojs.MediaTechController.extend({
   init: function(player, options, ready){
     videojs.MediaTechController.call(this, player, options, ready);
-    
+
+     // Copy the JavaScript options if they exists
+    if (typeof options['source'] != 'undefined') {
+      for (var key in options['source']) {
+        player.options()[key] = options['source'][key];
+      }
+    }
+
     this.player_ = player;
     this.player_el_ = document.getElementById(this.player_.id());
 
@@ -43,7 +50,7 @@ videojs.Vimeo = videojs.MediaTechController.extend({
     
     this.player_el_.insertBefore(this.el_, this.player_el_.firstChild);
     
-    this.baseUrl = (document.location.protocol == 'https')? 'https://secure.vimeo.com/video/' : 'http://player.vimeo.com/video/';
+    this.baseUrl = document.location.protocol + '//player.vimeo.com/video/';
 
     this.vimeo = {};
     this.vimeoInfo = {};
