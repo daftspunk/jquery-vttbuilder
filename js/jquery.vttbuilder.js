@@ -82,9 +82,7 @@
             // Video
             self.video = element.find('.vttb_video:first');
             self.video_id = self.video.find('video:first').attr('id');
-            self.video_obj = videojs('id_video', {
-                "techOrder": ["html5", "flash", "vimeo"],
-            });
+            self.video_obj = videojs('id_video');
 
             // Caption
             this.caption = element.find('.vttb_caption:first');
